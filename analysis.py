@@ -117,8 +117,36 @@ def products_price_range(df):
     )
     category_price_brand.to_csv(f"{ANALYSIS_OUTPUT}/products_price_range.csv", index=False)
 
+def loves_count(df):
+    def product_level(keys):
+        # removes redundancy: same aggregation logic used multiple times
+        return (
+            df.groupby(keys, as_index=False)
+              .agg(loves_count=("loves_count", "max"))
+        )
+    product_loves = product_level(["product_id", "product_name", "brand_name"])
+    
+    top_products = product_loves.sort_values("loves_count", ascending=False).head(20)
+    top_products.to_csv(f"{ANALYSIS_OUTPUT}/loves_count.csv", index=False)
 
+    brand_loves = (
+    product_loves.groupby("brand_name", as_index=False)
+                 .agg(total_loves=("loves_count", "sum"),
+                      product_count=("product_id", "nunique"))
+                 .sort_values("total_loves", ascending=False)
+    )
+    brand_loves.to_csv(f"{ANALYSIS_OUTPUT}/brands_loves_count.csv", index=False)
 
+    product_loves_cat = product_level(["product_id", "product_name", "brand_name",
+                "primary_category", "secondary_category", "tertiary_category"])
+    print(product_loves_cat["primary_category"], "product_loves_cat>>>>>>>")
+    category_loves = (
+        product_loves_cat.groupby("primary_category", as_index=False)
+                        .agg(total_loves=("loves_count", "sum"),
+                            product_count=("product_id", "nunique"))
+                        .sort_values("total_loves", ascending=False)
+    )
+    category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
 
 products_rating_brand_wise(clean_df)
@@ -126,3 +154,6 @@ products_reviews_sentiments(clean_df)
 product_categories(clean_df)
 products_count(clean_df)
 products_price_range(clean_df)
+
+# Getting Only Skincare category in primary_category from clean_df need to debug it.
+# loves_count(clean_df)
