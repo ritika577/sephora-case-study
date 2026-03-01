@@ -17,11 +17,14 @@ reviews = pd.concat(reviews_list, ignore_index=True)
 
 def merge_df():
     # start from merged dataframe (reviews + products)
-    df = reviews.merge(products, on="product_id", how="inner")
+    df = products.merge(reviews, on="product_id", how="left")
+    print("heheheeheh", df[["primary_category","author_id"]])
     cols_to_drop = [c for c in df.columns if c.endswith("_y")]
     df = df.drop(columns=cols_to_drop)
+
     df = df.rename(columns={c: c[:-2] for c in df.columns if c.endswith("_x")})
     df = df.dropna(subset=["price_usd"]).copy()
+
     return df
 
 merged_df = merge_df()
@@ -148,12 +151,16 @@ def loves_count(df):
     )
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
+def product_price_tier(df):
+    for row in df.itertuples(index=False):
+        print(row.size, "ccccccccc")
+        per_100_ml = (int(row.size)/float(row.price_usd))*100
+        print(per_100_ml, "per_100_ml>>>>>>>>")
 
 products_rating_brand_wise(clean_df)
 products_reviews_sentiments(clean_df)
 product_categories(clean_df)
 products_count(clean_df)
 products_price_range(clean_df)
-
-# Getting Only Skincare category in primary_category from clean_df need to debug it.
-# loves_count(clean_df)
+loves_count(clean_df)
+product_price_tier(clean_df)
