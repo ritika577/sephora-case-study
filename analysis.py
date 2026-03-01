@@ -152,10 +152,23 @@ def loves_count(df):
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
 def product_price_tier(df):
-    for row in df.itertuples(index=False):
-        print(row.size, "ccccccccc")
-        per_100_ml = (int(row.size)/float(row.price_usd))*100
-        print(per_100_ml, "per_100_ml>>>>>>>>")
+    # Keep only rows where price_per_100 is available
+    required_data = df[["product_id", "product_name", "primary_category","price_per_100"]]
+    mask = required_data["price_per_100"].notna()
+    # For each primary_category, compute the 60th and 90th percentile cutoffs
+    cutoffs = required_data[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
+    # cutoffs will have columns: 0.6 and 0.9
+    # rename them for clarity
+    cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
+    # Join these cutoffs back to each product row (so every row knows its category cutoffs)
+    required_data = required_data.merge(cutoffs, on="primary_category", how="left")
+    # Assign tier using the cutoffs
+    required_data["tier"] = None  # creates an object column
+    required_data.loc[mask & (required_data["price_per_100"] <= required_data["p60"]), "tier"] = "Standard"
+    required_data.loc[mask & (required_data["price_per_100"] >  required_data["p60"]) & (required_data["price_per_100"] <= required_data["p90"]), "tier"] = "Premium"
+    required_data.loc[mask & (required_data["price_per_100"] >  required_data["p90"]), "tier"] = "Luxury"
+    required_data.to_csv(f"{ANALYSIS_OUTPUT}/product_price_tier.csv", index=False)
+
 
 products_rating_brand_wise(clean_df)
 products_reviews_sentiments(clean_df)
