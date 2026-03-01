@@ -169,6 +169,26 @@ def product_price_tier(df):
     required_data.loc[mask & (required_data["price_per_100"] >  required_data["p90"]), "tier"] = "Luxury"
     required_data.to_csv(f"{ANALYSIS_OUTPUT}/product_price_tier.csv", index=False)
 
+def online_products(df):
+    df["online_only"] = pd.to_numeric(df["online_only"], errors="coerce").fillna(0).astype(int)
+    online_only_df = df[df["online_only"] == 1]
+    online_only_df[["product_id", "product_name", "brand_name", "price_usd", "primary_category"]].head(20)
+    online_only_df.to_csv(f"{ANALYSIS_OUTPUT}/online_products.csv", index=False)
+
+def exclusive_products(df):
+    # make sure it's numeric (safe)
+    df["sephora_exclusive"] = (
+        pd.to_numeric(df["sephora_exclusive"], errors="coerce")
+        .fillna(0)
+        .astype(int)
+    )
+    # filter Sephora exclusive products
+    sephora_exclusive_df = df[df["sephora_exclusive"] == 1]
+    # view results
+    sephora_exclusive_df[
+        ["product_id", "product_name", "brand_name", "price_usd", "primary_category"]
+    ].head(20)
+    sephora_exclusive_df.to_csv(f"{ANALYSIS_OUTPUT}/exclusive_products.csv", index=False)
 
 products_rating_brand_wise(clean_df)
 products_reviews_sentiments(clean_df)
@@ -177,3 +197,5 @@ products_count(clean_df)
 products_price_range(clean_df)
 loves_count(clean_df)
 product_price_tier(clean_df)
+online_products(clean_df)
+exclusive_products(clean_df)
