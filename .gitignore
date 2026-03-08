@@ -1,0 +1,9 @@
+sephora.duckdb
+chroma_store/
+*.sqlite3
+.venv/
+__pycache__/
+.DS_Store
+analysis_output/
+outputs/
+data/
