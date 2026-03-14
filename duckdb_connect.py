@@ -292,6 +292,10 @@ def process_structured_question(question: str) -> Dict[str, Any]:
             "message": f"Execution failed: {str(e)}"
         }
 
+def sql_answer(question):
+    res = process_structured_question(question)
+    print("query: ",res["generated_sql"])
+    return run_query(res["generated_sql"])
 
 if __name__ == "__main__":
     result = process_structured_question("Top 10 brands by average rating")
