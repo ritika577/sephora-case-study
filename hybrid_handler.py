@@ -67,9 +67,7 @@ User question:
 def combined_results(question):
     prompt = build_hybrid_split_prompt(question)
     result = call_ollama(prompt)
-    print("result::", result)
     structured_res = sql_answer(result["structured_question"])
-    print("structured_res: ",structured_res.head(5))
     product_ids=None
     if not structured_res.empty:
         product_ids=structured_res["product_id"]
@@ -77,7 +75,6 @@ def combined_results(question):
         brand_names=structured_res["brand_name"]
         categories=structured_res["primary_category"]
     semantic_res = user_question(result["semantic_question"],product_ids)
-    print(type(semantic_res))
     payload = {
         "route": "hybrid",
         "question": question,
