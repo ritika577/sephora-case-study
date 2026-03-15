@@ -20,17 +20,17 @@ MAX_SQL_RETRIES = 1
 con = duckdb.connect(DB_PATH)
 
 
-def initialize_database() -> None:
-    """
-    Loads cleaned CSV into DuckDB table.
-    """
-    con.execute(f"""
-        CREATE OR REPLACE TABLE {TABLE_NAME} AS
-        SELECT * FROM read_csv_auto('{CSV_PATH}');
-    """)
+# def initialize_database() -> None:
+#     """
+#     Loads cleaned CSV into DuckDB table.
+#     """
+#     con.execute(f"""
+#         CREATE OR REPLACE TABLE {TABLE_NAME} AS
+#         SELECT * FROM read_csv_auto('{CSV_PATH}');
+#     """)
 
 
-initialize_database()
+# initialize_database()
 
 
 # =========================================================
@@ -294,7 +294,6 @@ def process_structured_question(question: str) -> Dict[str, Any]:
 
 def sql_answer(question):
     res = process_structured_question(question)
-    print("query: ",res["generated_sql"])
     return run_query(res["generated_sql"])
 
 if __name__ == "__main__":

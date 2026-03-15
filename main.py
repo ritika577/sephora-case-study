@@ -1,7 +1,7 @@
 from router import classify_question
 from duckdb_connect import sql_answer
 from chroma_connect import user_question
-# from hybrid_handler import process_hybrid_question
+from hybrid_handler import combined_results
 
 
 def process_user_question(question: str):
@@ -22,10 +22,7 @@ def process_user_question(question: str):
     if route == "hybrid":
         return {
             "route": "hybrid",
-            "result": {
-                "status": "todo",
-                "message": "Send this question to hybrid pipeline."
-            }
+            "result": combined_results(question)
         }
 
     return {
