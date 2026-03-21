@@ -1,7 +1,7 @@
 import duckdb
-import requests
 import re
 from typing import Any, Dict, Optional, Tuple
+from ollama_utils import call_ollama_json
 
 DB_PATH = "sephora.duckdb"
 CSV_PATH = "analysis_output/clean_merged.csv"
@@ -29,23 +29,6 @@ con = duckdb.connect(DB_PATH)
 
 
 # initialize_database()
-
-
-# =========================================================
-# OLLAMA CALL
-# =========================================================
-def call_ollama(prompt: str) -> str:
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "stream": False,
-    }
-
-    response = requests.post(OLLAMA_GENERATE_URL, json=payload, timeout=120)
-    response.raise_for_status()
-
-    data = response.json()
-    return data.get("response", "").strip()
 
 
 # =========================================================
@@ -219,7 +202,7 @@ def validate_sql(sql: str) -> Tuple[bool, Optional[str]]:
 def generate_sql(question: str, previous_error: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     try:
         prompt = build_sql_prompt(question, previous_error=previous_error)
-        raw_output = call_ollama(prompt)
+        raw_output = call_ollama_json(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
         sql = extract_sql(raw_output)
 
         if not sql:
@@ -293,7 +276,3 @@ def process_structured_question(question: str) -> Dict[str, Any]:
 def sql_answer(question):
     res = process_structured_question(question)
     return run_query(res["generated_sql"])
-
-if __name__ == "__main__":
-    result = process_structured_question("Top 10 brands by average rating")
-    print(result)

@@ -1,39 +1,10 @@
 from chroma_connect import user_question
 from duckdb_connect import sql_answer
-import json
-import requests
-import re
+from ollama_utils import  call_ollama_json
 
 OLLAMA_GENERATE_URL = "http://localhost:11434/api/generate"
 OLLAMA_MODEL = "qwen2.5:7b"
-
-
-def call_ollama(prompt: str,retries:int=3) -> str:
-    for attempt in range(1,retries+1):
-        try:
-            response = requests.post(
-                OLLAMA_GENERATE_URL,
-                json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
-                timeout=60
-            )
-            response.raise_for_status()
-        except requests.exceptions.ConnectionError:
-            raise ConnectionError("Ollama is not running. Start it with 'ollama serve'.")
-        except requests.exceptions.Timeout:
-            raise TimeoutError("Ollama request timed out after 60s.")
         
-        result = response.json().get("response", "").strip()
-        if not result:
-            raise ValueError("Ollama returned an empty response.")
-        cleaned = strip_markdown_fences(result)
-        try:
-            result = json.loads(cleaned)
-        except Exception as e:
-            if attempt == retries:
-                    raise ValueError(f"Failed to get valid JSON after {retries} attempts")
-        return result
-        
-
 
 def build_hybrid_split_prompt(question: str) -> str:
     return f"""
@@ -66,7 +37,7 @@ User question:
 
 def combined_results(question):
     prompt = build_hybrid_split_prompt(question)
-    result = call_ollama(prompt)
+    result = call_ollama_json(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
     structured_res = sql_answer(result["structured_question"])
     product_ids=None
     if not structured_res.empty:
@@ -98,15 +69,3 @@ def combined_results(question):
         }
     }
     return payload
-
-
-def strip_markdown_fences(text: str) -> str:
-      match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-      if match:
-          return match.group(1)
-      return text.strip()
-
-
-if __name__ == "__main__":
-    result = combined_results("Which moisturizer has the highest rating and what do people complain about?")
-    print(result)
