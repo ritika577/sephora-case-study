@@ -218,55 +218,32 @@ def process_structured_question(question: str) -> Dict[str, Any]:
     This function assumes the router has already decided
     that the question is structured.
     """
-    if not question or not question.strip():
-        return {
-            "status": "error",
-            "message": "Question is empty."
-        }
-
-    last_error = None
-    generated_sql = None
-
-    for attempt in range(MAX_SQL_RETRIES + 1):
-        sql, gen_error = generate_sql(question, previous_error=last_error)
-
-        if gen_error:
-            return {
-                "status": "error",
-                "message": gen_error
-            }
-
-        generated_sql = sql
-
-        is_valid, validation_error = validate_sql(generated_sql)
-        if is_valid:
-            break
-
-        last_error = validation_error
-
-        if attempt == MAX_SQL_RETRIES:
-            return {
-                "status": "error",
-                "generated_sql": generated_sql,
-                "message": validation_error
-            }
-
     try:
-        df = run_query(generated_sql)
-        return {
-            "status": "success",
-            "generated_sql": generated_sql,
-            "data": df
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "generated_sql": generated_sql,
-            "message": f"Execution failed: {str(e)}"
-        }
+        if not question or not question.strip():
+            return None, "Question is empty."
 
-def sql_answer(question):
-    res = process_structured_question(question)
-    if res["status"] == "error":
-        raise ValueError(res["message"])
-    return res["data"]
+        last_error = None
+        generated_sql = None
+
+        for attempt in range(MAX_SQL_RETRIES + 1):
+            sql, gen_error = generate_sql(question, previous_error=last_error)
+
+            if gen_error:
+                return None, gen_error
+
+            generated_sql = sql
+
+            is_valid, validation_error = validate_sql(generated_sql)
+            if is_valid:
+                break
+
+            last_error = validation_error
+
+            if attempt == MAX_SQL_RETRIES:
+                return None, validation_error
+
+        df = run_query(generated_sql)
+        return df, None
+    except Exception as e:
+        print(f"Error, while fetching the sql data: {str(e)} ")
+        return None,  str(e) 

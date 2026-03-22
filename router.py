@@ -1,21 +1,7 @@
-import requests
+from ollama_utils import call_ollama, startup_checks
+from config import OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
-OLLAMA_GENERATE_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "qwen2.5:7b"
-
-
-def call_ollama(prompt: str) -> str:
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "stream": False,
-    }
-
-    response = requests.post(OLLAMA_GENERATE_URL, json=payload, timeout=60)
-    response.raise_for_status()
-
-    data = response.json()
-    return data.get("response", "").strip()
+startup_checks(OLLAMA_MODEL)
 
 
 def build_routing_prompt(question: str) -> str:
@@ -52,7 +38,7 @@ def classify_question(question: str) -> str:
     prompt = build_routing_prompt(question)
 
     try:
-        raw = call_ollama(prompt).lower().strip()
+        raw = call_ollama(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt).lower().strip()
 
         if raw in {"structured", "semantic", "hybrid"}:
             return raw
@@ -64,8 +50,8 @@ def classify_question(question: str) -> str:
         if "structured" in raw:
             return "structured"
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[router] LLM classification failed, falling back to keyword match: {e}")
 
     # fallback
     q = question.lower()

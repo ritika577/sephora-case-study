@@ -1,5 +1,5 @@
 from chroma_connect import user_question
-from duckdb_connect import sql_answer
+from duckdb_connect import process_structured_question
 from ollama_utils import call_ollama_json, startup_checks
 from config import OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
@@ -37,43 +37,35 @@ User question:
 
 def combined_results(question):
     prompt = build_hybrid_split_prompt(question)
-    result = call_ollama_json(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
+    try:
+        result = call_ollama_json(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
+        if "structured_question" not in result or "semantic_question" not in result:
+            raise ValueError(f"LLM returned unexpected JSON keys: {list(result.keys())}")
 
-    if "structured_question" not in result or "semantic_question" not in result:
-        raise ValueError(f"LLM returned unexpected JSON keys: {list(result.keys())}")
+        structured_res,structured_err = process_structured_question(result["structured_question"])
+        product_ids = None
+        if not structured_res.empty:
+            product_ids = list(structured_res["product_id"])
 
-    structured_res = sql_answer(result["structured_question"])
-    product_ids = None
-    product_names = None
-    brand_names = None
-    categories = None
-    if not structured_res.empty:
-        product_ids = list(structured_res["product_id"])
-        product_names = list(structured_res["product_name"])
-        brand_names = list(structured_res["brand_name"])
-        categories = list(structured_res["primary_category"])
+        semantic_res, semantic_err = user_question(result["semantic_question"], product_ids)
 
-    docs, _ = user_question(result["semantic_question"], product_ids)
-    payload = {
-        "route": "hybrid",
-        "question": question,
-        "structured_question": result["structured_question"],
-        "semantic_question": result["semantic_question"],
-        "retrieval_scope": {
-            "filter_type": "product_ids",
-            "values": product_ids
-        },
+        payload = {
         "structured": structured_res,
-        "semantic": docs,
-        "combined_context": {
-            "top_rows": structured_res.head(3).to_dict("records") if not structured_res.empty else None,
-            "review_snippets": docs[:5] if docs else None,
-            "entities": {
-                "product_ids": product_ids,
-                "product_names": product_names,
-                "brand_names": brand_names,
-                "categories": categories
-            }
+        "semantic": semantic_res ,
+        "error": {
+                "split": None,
+                "structured": structured_err,
+                "semantic": semantic_err
+            }       
         }
-    }
-    return payload
+        return payload
+    except Exception as e:
+        return {
+        "structured": None,
+        "semantic": None ,
+        "error": {
+                "split": str(e),
+                "structured": None,
+                "semantic": None
+            }       
+        }

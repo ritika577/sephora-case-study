@@ -26,7 +26,6 @@ def initialization()-> None:
     metas = df[["product_id","brand_name","primary_category"]].astype(str).to_dict("records")
 
     for i in range(0, len(df), BATCH_SIZE):
-        print("chunk: start: ",i,"end: ",i+batch)
         chunk_ids = ids[i:i+BATCH_SIZE]
         chunk_docs = documents[i:i+BATCH_SIZE]
         chunk_texts = texts[i:i+BATCH_SIZE]
@@ -45,20 +44,27 @@ if __name__ == "__main__":
     initialization()
 
 def user_question(question, product_ids=None, limit=5):
-    question = question.strip() if question else None
-    if not question:
-        return None, "question is not valid"
+    try:
+        question = question.strip() if question else None
+        if not question:
+            return None, "question is not valid"
 
-    query_args = {
-        "query_embeddings": [embed(EMBED_MODEL, OLLAMA_EMBED_URL, question)],
-        "n_results": limit,
-    }
-
-    # If product_id is stored in metadata
-    if product_ids is not None:
-        query_args["where"] = {
-            "product_id": {"$in": list(product_ids)}
+        query_args = {
+            "query_embeddings": [embed(EMBED_MODEL, OLLAMA_EMBED_URL, question)],
+            "n_results": limit,
         }
-    results = coll.query(**query_args)
-    docs = results["documents"]
-    return docs, None
+
+        # If product_id is stored in metadata
+        if product_ids is not None:
+            query_args["where"] = {
+                "product_id": {"$in": list(product_ids)}
+            }
+        results = coll.query(**query_args)
+        docs = results["documents"]
+        return docs, None
+    except Exception as e:
+        print(f"Error while fetching the required data for user's input from chroma : {str(e)}")
+        return None, str(e)
+
+
+    

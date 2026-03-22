@@ -1,5 +1,5 @@
 from router import classify_question
-from duckdb_connect import sql_answer
+from duckdb_connect import process_structured_question
 from chroma_connect import user_question
 from hybrid_handler import combined_results
 
@@ -10,7 +10,7 @@ def process_user_question(question: str):
     if route == "structured":
         return {
             "route": "structured",
-            "result": sql_answer(question)
+            "result": process_structured_question(question)
         }
 
     if route == "semantic":
