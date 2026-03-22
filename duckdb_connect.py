@@ -1,9 +1,10 @@
 import duckdb
 import re
 from typing import Any, Dict, Optional, Tuple
-from ollama_utils import call_ollama
+from ollama_utils import call_ollama, startup_checks
 from config import DB_PATH, TABLE_NAME, DEFAULT_LIMIT, MAX_SQL_RETRIES, OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
+startup_checks(OLLAMA_MODEL)
 
 # DUCKDB SETUP
 con = duckdb.connect(DB_PATH)

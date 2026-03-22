@@ -1,7 +1,9 @@
 import pandas as pd
 import chromadb
-from ollama_utils import embed
+from ollama_utils import embed, startup_checks
 from config import EMBED_MODEL, OLLAMA_EMBED_URL, CHROMA_PATH, CHROMA_COLLECTION, BATCH_SIZE
+
+startup_checks(EMBED_MODEL)
 
 df = pd.read_csv("analysis_output/clean_merged.csv").fillna("")
 

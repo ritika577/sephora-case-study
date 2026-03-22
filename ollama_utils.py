@@ -5,20 +5,31 @@ from config import OLLAMA_BASE_URL, OLLAMA_TAGS_URL, MAX_EMBED_CHARS
 
 # check_ollama_running
 def check_ollama_running() -> None:
-      try:
-          r = requests.get(OLLAMA_BASE_URL, timeout=5)
-          r.raise_for_status()
-      except requests.exceptions.ConnectionError:
-          raise ConnectionError("Ollama is not running. Start it with 'ollama serve'.")
-      except requests.exceptions.Timeout:
-          raise TimeoutError("Ollama health check timed out.")
+    try:
+        r = requests.get(OLLAMA_BASE_URL, timeout=5)
+        r.raise_for_status()
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError("Ollama is not running. Start it with 'ollama serve'.")
+    except requests.exceptions.Timeout:
+        raise TimeoutError("Ollama health check timed out.")
 
-# check_model_available      
+# check_model_available
 def check_model_available(model: str) -> None:
-      r = requests.get(OLLAMA_TAGS_URL, timeout=5)
-      models = [m["name"] for m in r.json().get("models", [])]
-      if model not in models:
-          raise ValueError(f"Model '{model}' is not pulled. Run 'ollama pull {model}'.")
+    try:
+        r = requests.get(OLLAMA_TAGS_URL, timeout=5)
+        r.raise_for_status()
+    except requests.exceptions.ConnectionError:
+        raise ConnectionError("Ollama is not running. Start it with 'ollama serve'.")
+    except requests.exceptions.Timeout:
+        raise TimeoutError("Ollama health check timed out.")
+    models = [m["name"] for m in r.json().get("models", [])]
+    if model not in models:
+        raise ValueError(f"Model '{model}' is not pulled. Run 'ollama pull {model}'.")
+
+# startup_checks
+def startup_checks(model: str) -> None:
+    check_ollama_running()
+    check_model_available(model)
       
 # strip_markdown_fences
 def strip_markdown_fences(text: str) -> str:
