@@ -1,17 +1,8 @@
 import duckdb
 import re
 from typing import Any, Dict, Optional, Tuple
-from ollama_utils import call_ollama_json
-
-DB_PATH = "sephora.duckdb"
-CSV_PATH = "analysis_output/clean_merged.csv"
-TABLE_NAME = "sephora"
-
-OLLAMA_GENERATE_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "qwen2.5:7b"
-
-DEFAULT_LIMIT = 50
-MAX_SQL_RETRIES = 1
+from ollama_utils import call_ollama
+from config import DB_PATH, TABLE_NAME, DEFAULT_LIMIT, MAX_SQL_RETRIES, OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
 
 # DUCKDB SETUP
@@ -202,7 +193,7 @@ def validate_sql(sql: str) -> Tuple[bool, Optional[str]]:
 def generate_sql(question: str, previous_error: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     try:
         prompt = build_sql_prompt(question, previous_error=previous_error)
-        raw_output = call_ollama_json(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
+        raw_output = call_ollama(OLLAMA_MODEL, OLLAMA_GENERATE_URL, prompt)
         sql = extract_sql(raw_output)
 
         if not sql:
@@ -275,4 +266,6 @@ def process_structured_question(question: str) -> Dict[str, Any]:
 
 def sql_answer(question):
     res = process_structured_question(question)
-    return run_query(res["generated_sql"])
+    if res["status"] == "error":
+        raise ValueError(res["message"])
+    return res["data"]

@@ -1,15 +1,7 @@
 import requests
 import re
 import json
-
-# constants
-OLLAMA_BASE_URL = "http://localhost:11434"
-OLLAMA_GENERATE_URL = OLLAMA_BASE_URL + "/api/generate"
-OLLAMA_EMBED_URL = OLLAMA_BASE_URL + "/api/embed"
-OLLAMA_TAGS_URL = OLLAMA_BASE_URL + "/api/tags"
-OLLAMA_MODEL = "qwen2.5:7b"
-EMBED_MODEL = "nomic-embed-text"
-MAX_EMBED_CHARS = 8000
+from config import OLLAMA_BASE_URL, OLLAMA_TAGS_URL, MAX_EMBED_CHARS
 
 # check_ollama_running
 def check_ollama_running() -> None:
