@@ -44,7 +44,7 @@ def combined_results(question):
 
         structured_res,structured_err = process_structured_question(result["structured_question"])
         product_ids = None
-        if not structured_res.empty:
+        if structured_res is not None and not structured_res.empty and "product_id" in structured_res.columns:
             product_ids = list(structured_res["product_id"])
 
         semantic_res, semantic_err = user_question(result["semantic_question"], product_ids)
