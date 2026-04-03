@@ -1,9 +1,7 @@
 from chroma_connect import user_question
 from duckdb_connect import process_structured_question
-from ollama_utils import call_ollama_json, startup_checks
+from ollama_utils import call_ollama_json
 from config import OLLAMA_MODEL, OLLAMA_GENERATE_URL
-
-startup_checks(OLLAMA_MODEL)
         
 
 def build_hybrid_split_prompt(question: str) -> str:

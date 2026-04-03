@@ -1,7 +1,5 @@
-from ollama_utils import call_ollama, startup_checks
+from ollama_utils import call_ollama
 from config import OLLAMA_MODEL, OLLAMA_GENERATE_URL
-
-startup_checks(OLLAMA_MODEL)
 
 
 def build_routing_prompt(question: str) -> str:

@@ -1,26 +1,11 @@
 import duckdb
 import re
-from typing import Any, Dict, Optional, Tuple
-from ollama_utils import call_ollama, startup_checks
+from typing import Optional, Tuple
+from ollama_utils import call_ollama
 from config import DB_PATH, TABLE_NAME, DEFAULT_LIMIT, MAX_SQL_RETRIES, OLLAMA_MODEL, OLLAMA_GENERATE_URL
-
-startup_checks(OLLAMA_MODEL)
 
 # DUCKDB SETUP
 con = duckdb.connect(DB_PATH)
-
-
-# def initialize_database() -> None:
-#     """
-#     Loads cleaned CSV into DuckDB table.
-#     """
-#     con.execute(f"""
-#         CREATE OR REPLACE TABLE {TABLE_NAME} AS
-#         SELECT * FROM read_csv_auto('{CSV_PATH}');
-#     """)
-
-
-# initialize_database()
 
 
 # =========================================================
@@ -213,7 +198,7 @@ def run_query(sql: str):
     return con.execute(sql).fetchdf()
 
 
-def process_structured_question(question: str) -> Dict[str, Any]:
+def process_structured_question(question: str) -> Tuple[Optional[object], Optional[str]]:
     """
     This function assumes the router has already decided
     that the question is structured.
@@ -245,5 +230,4 @@ def process_structured_question(question: str) -> Dict[str, Any]:
         df = run_query(generated_sql)
         return df, None
     except Exception as e:
-        print(f"Error, while fetching the sql data: {str(e)} ")
-        return None,  str(e) 
+        return None, str(e)

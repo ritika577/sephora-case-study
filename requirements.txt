@@ -1,5 +1,7 @@
 pandas
 numpy
-matplotlib
-numpy
+requests
+duckdb
+chromadb
+streamlit
 vaderSentiment

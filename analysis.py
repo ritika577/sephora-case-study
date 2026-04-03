@@ -1,24 +1,26 @@
 import os
 import glob
 import pandas as pd
-import numpy as np
 from data_cleaning import clean_text
+from config import PROJECT_ROOT
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
 analyzer = SentimentIntensityAnalyzer()
 
-DATA_DIR = "data/raw"
-ANALYSIS_OUTPUT = "analysis_output"
+DATA_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+ANALYSIS_OUTPUT = os.path.join(PROJECT_ROOT, "analysis_output")
 PRODUCTS_FILE = os.path.join(DATA_DIR, "product_info.csv")
-REVIEWS_FILES = sorted(glob.glob(os.path.join(DATA_DIR, "reviews_*.csv")))
-products = pd.read_csv(PRODUCTS_FILE)
-# combine all review parts into one dataframe
-reviews_list = [pd.read_csv(f) for f in REVIEWS_FILES]
-reviews = pd.concat(reviews_list, ignore_index=True)
+REVIEWS_PATTERN = os.path.join(DATA_DIR, "reviews_*.csv")
+
 
 def merge_df():
-    # start from merged dataframe (reviews + products)
+    # read raw CSVs
+    products = pd.read_csv(PRODUCTS_FILE)
+    reviews_files = sorted(glob.glob(REVIEWS_PATTERN))
+    reviews = pd.concat([pd.read_csv(f) for f in reviews_files], ignore_index=True)
+
+    # merge products + reviews
     df = products.merge(reviews, on="product_id", how="left")
-    print("heheheeheh", df[["primary_category","author_id"]])
     cols_to_drop = [c for c in df.columns if c.endswith("_y")]
     df = df.drop(columns=cols_to_drop)
 
@@ -27,9 +29,6 @@ def merge_df():
 
     return df
 
-merged_df = merge_df()
-clean_df = clean_text(merged_df)
-clean_df.to_csv(f"{ANALYSIS_OUTPUT}/clean_merged.csv", index=False)
 
 def products_rating_brand_wise(df):
     prod_rating = (
@@ -43,8 +42,6 @@ def products_rating_brand_wise(df):
     )
     prod_rating.to_csv(f"{ANALYSIS_OUTPUT}/products_rating_brand_wise.csv", index=False)
 
-
-# def products_feedback_counts(df):------------ already have the data for this, so no need to compute for visualization
 
 def products_reviews_sentiments(df):
     # 1) prepare titles
@@ -122,13 +119,12 @@ def products_price_range(df):
 
 def loves_count(df):
     def product_level(keys):
-        # removes redundancy: same aggregation logic used multiple times
         return (
             df.groupby(keys, as_index=False)
               .agg(loves_count=("loves_count", "max"))
         )
     product_loves = product_level(["product_id", "product_name", "brand_name"])
-    
+
     top_products = product_loves.sort_values("loves_count", ascending=False).head(20)
     top_products.to_csv(f"{ANALYSIS_OUTPUT}/loves_count.csv", index=False)
 
@@ -142,7 +138,6 @@ def loves_count(df):
 
     product_loves_cat = product_level(["product_id", "product_name", "brand_name",
                 "primary_category", "secondary_category", "tertiary_category"])
-    print(product_loves_cat["primary_category"], "product_loves_cat>>>>>>>")
     category_loves = (
         product_loves_cat.groupby("primary_category", as_index=False)
                         .agg(total_loves=("loves_count", "sum"),
@@ -152,50 +147,49 @@ def loves_count(df):
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
 def product_price_tier(df):
-    # Keep only rows where price_per_100 is available
     required_data = df[["product_id", "product_name", "primary_category","price_per_100"]]
     mask = required_data["price_per_100"].notna()
-    # For each primary_category, compute the 60th and 90th percentile cutoffs
     cutoffs = required_data[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
-    # cutoffs will have columns: 0.6 and 0.9
-    # rename them for clarity
     cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
-    # Join these cutoffs back to each product row (so every row knows its category cutoffs)
     required_data = required_data.merge(cutoffs, on="primary_category", how="left")
-    # Assign tier using the cutoffs
-    required_data["tier"] = None  # creates an object column
+    required_data["tier"] = None
     required_data.loc[mask & (required_data["price_per_100"] <= required_data["p60"]), "tier"] = "Standard"
     required_data.loc[mask & (required_data["price_per_100"] >  required_data["p60"]) & (required_data["price_per_100"] <= required_data["p90"]), "tier"] = "Premium"
     required_data.loc[mask & (required_data["price_per_100"] >  required_data["p90"]), "tier"] = "Luxury"
     required_data.to_csv(f"{ANALYSIS_OUTPUT}/product_price_tier.csv", index=False)
 
 def online_products(df):
+    df = df.copy()
     df["online_only"] = pd.to_numeric(df["online_only"], errors="coerce").fillna(0).astype(int)
     online_only_df = df[df["online_only"] == 1]
-    online_only_df[["product_id", "product_name", "brand_name", "price_usd", "primary_category"]].head(20)
     online_only_df.to_csv(f"{ANALYSIS_OUTPUT}/online_products.csv", index=False)
 
 def exclusive_products(df):
-    # make sure it's numeric (safe)
+    df = df.copy()
     df["sephora_exclusive"] = (
         pd.to_numeric(df["sephora_exclusive"], errors="coerce")
         .fillna(0)
         .astype(int)
     )
-    # filter Sephora exclusive products
     sephora_exclusive_df = df[df["sephora_exclusive"] == 1]
-    # view results
-    sephora_exclusive_df[
-        ["product_id", "product_name", "brand_name", "price_usd", "primary_category"]
-    ].head(20)
     sephora_exclusive_df.to_csv(f"{ANALYSIS_OUTPUT}/exclusive_products.csv", index=False)
 
-products_rating_brand_wise(clean_df)
-products_reviews_sentiments(clean_df)
-product_categories(clean_df)
-products_count(clean_df)
-products_price_range(clean_df)
-loves_count(clean_df)
-product_price_tier(clean_df)
-online_products(clean_df)
-exclusive_products(clean_df)
+
+if __name__ == "__main__":
+    os.makedirs(ANALYSIS_OUTPUT, exist_ok=True)
+
+    merged_df = merge_df()
+    clean_df = clean_text(merged_df)
+    clean_df.to_csv(f"{ANALYSIS_OUTPUT}/clean_merged.csv", index=False)
+
+    products_rating_brand_wise(clean_df)
+    products_reviews_sentiments(clean_df)
+    product_categories(clean_df)
+    products_count(clean_df)
+    products_price_range(clean_df)
+    loves_count(clean_df)
+    product_price_tier(clean_df)
+    online_products(clean_df)
+    exclusive_products(clean_df)
+
+    print("[analysis] All analysis outputs saved.")
