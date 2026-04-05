@@ -2,10 +2,16 @@
 Ingestion pipeline: reads raw CSVs, cleans data, loads into DuckDB and ChromaDB.
 
 Usage:
-    python ingest.py              # full pipeline (clean + duckdb + chroma)
-    python ingest.py --duckdb     # only reload DuckDB from existing clean CSV
-    python ingest.py --chroma     # only reload ChromaDB from existing clean CSV
-    python ingest.py --clean      # only re-clean data (no DB loading)
+    python ingest.py                        # full pipeline (clean + duckdb + chroma)
+    python ingest.py --clean                # merge + clean only
+    python ingest.py --duckdb               # reload DuckDB from existing clean CSV
+    python ingest.py --chroma               # reload ChromaDB from existing clean CSV
+    python ingest.py --clean --duckdb       # clean then reload DuckDB
+    python ingest.py --clean --chroma       # clean then reload ChromaDB
+    python ingest.py --duckdb --chroma      # reload both DBs from existing CSV
+    python ingest.py --clean --duckdb --chroma  # clean + reload both (same as full)
+
+Flags can be combined freely. Steps run in order: clean -> duckdb -> chroma.
 """
 
 import os
@@ -17,15 +23,11 @@ import chromadb
 from data_cleaning import clean_text
 from ollama_utils import embed, startup_checks
 from config import (
-    PROJECT_ROOT, DB_PATH, CSV_PATH, TABLE_NAME,
+    DB_PATH, CSV_PATH, TABLE_NAME,
     EMBED_MODEL, OLLAMA_EMBED_URL,
     CHROMA_PATH, CHROMA_COLLECTION, BATCH_SIZE,
+    DATA_DIR, ANALYSIS_OUTPUT, PRODUCTS_FILE, REVIEWS_PATTERN,
 )
-
-DATA_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
-ANALYSIS_OUTPUT = os.path.join(PROJECT_ROOT, "analysis_output")
-PRODUCTS_FILE = os.path.join(DATA_DIR, "product_info.csv")
-REVIEWS_PATTERN = os.path.join(DATA_DIR, "reviews_*.csv")
 
 
 # =========================================================
@@ -182,21 +184,26 @@ def run_full_pipeline() -> None:
 # CLI ENTRY POINT
 # =========================================================
 if __name__ == "__main__":
+    valid_flags = {"--clean", "--duckdb", "--chroma"}
     args = set(sys.argv[1:])
+    unknown = args - valid_flags
 
-    if not args:
-        run_full_pipeline()
-    elif args == {"--clean"}:
-        merged = merge_raw_csvs()
-        clean_and_save(merged)
-    elif args == {"--duckdb"}:
-        load_duckdb()
-    elif args == {"--chroma"}:
-        load_chromadb()
-    elif args == {"--duckdb", "--chroma"}:
-        load_duckdb()
-        load_chromadb()
-    else:
-        print(f"Unknown arguments: {args}")
+    if unknown:
+        print(f"Unknown arguments: {unknown}")
         print(__doc__)
         sys.exit(1)
+
+    if not args:
+        # No flags = full pipeline
+        run_full_pipeline()
+    else:
+        # Run each requested step in order
+        if "--clean" in args:
+            merged = merge_raw_csvs()
+            clean_and_save(merged)
+        if "--duckdb" in args:
+            load_duckdb()
+        if "--chroma" in args:
+            load_chromadb()
+
+    print("[ingest] Done.")

@@ -3,7 +3,10 @@ chroma_store/
 *.sqlite3
 .venv/
 __pycache__/
+*.pyc
 .DS_Store
+.env
 analysis_output/
 outputs/
 data/
+.github

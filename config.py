@@ -20,7 +20,7 @@ DB_PATH = os.path.join(PROJECT_ROOT, "sephora.duckdb")
 CSV_PATH = os.path.join(PROJECT_ROOT, "analysis_output", "clean_merged.csv")
 TABLE_NAME = "sephora"
 DEFAULT_LIMIT = 50
-MAX_SQL_RETRIES = 1
+MAX_SQL_RETRIES = 3
 
 # =========================================================
 # CHROMADB
@@ -29,3 +29,11 @@ CHROMA_PATH = os.path.join(PROJECT_ROOT, "chroma_store")
 CHROMA_COLLECTION = "sephora_merged"
 BATCH_SIZE = 500
 MAX_EMBED_CHARS = 8000
+
+# =========================================================
+# DATA PATHS
+# =========================================================
+DATA_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
+ANALYSIS_OUTPUT = os.path.join(PROJECT_ROOT, "analysis_output")
+PRODUCTS_FILE = os.path.join(DATA_DIR, "product_info.csv")
+REVIEWS_PATTERN = os.path.join(DATA_DIR, "reviews_*.csv")

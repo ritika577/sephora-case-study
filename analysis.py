@@ -1,36 +1,13 @@
 import os
-import glob
 import pandas as pd
 from data_cleaning import clean_text
-from config import PROJECT_ROOT
+from config import ANALYSIS_OUTPUT
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 analyzer = SentimentIntensityAnalyzer()
 
-DATA_DIR = os.path.join(PROJECT_ROOT, "data", "raw")
-ANALYSIS_OUTPUT = os.path.join(PROJECT_ROOT, "analysis_output")
-PRODUCTS_FILE = os.path.join(DATA_DIR, "product_info.csv")
-REVIEWS_PATTERN = os.path.join(DATA_DIR, "reviews_*.csv")
 
-
-def merge_df():
-    # read raw CSVs
-    products = pd.read_csv(PRODUCTS_FILE)
-    reviews_files = sorted(glob.glob(REVIEWS_PATTERN))
-    reviews = pd.concat([pd.read_csv(f) for f in reviews_files], ignore_index=True)
-
-    # merge products + reviews
-    df = products.merge(reviews, on="product_id", how="left")
-    cols_to_drop = [c for c in df.columns if c.endswith("_y")]
-    df = df.drop(columns=cols_to_drop)
-
-    df = df.rename(columns={c: c[:-2] for c in df.columns if c.endswith("_x")})
-    df = df.dropna(subset=["price_usd"]).copy()
-
-    return df
-
-
-def products_rating_brand_wise(df):
+def products_rating_brand_wise(df: pd.DataFrame) -> None:
     prod_rating = (
     df.groupby(["brand_name", "product_id", "product_name"], as_index=False)
       .agg(avg_rating=("rating", "mean"),
@@ -43,7 +20,7 @@ def products_rating_brand_wise(df):
     prod_rating.to_csv(f"{ANALYSIS_OUTPUT}/products_rating_brand_wise.csv", index=False)
 
 
-def products_reviews_sentiments(df):
+def products_reviews_sentiments(df: pd.DataFrame) -> None:
     # 1) prepare titles
     reviews_sentiments_df = df[["brand_name", "product_id", "product_name", "review_title"]].copy()
     reviews_sentiments_df["review_title_clean"] = reviews_sentiments_df["review_title"].fillna("").astype(str).str.strip()
@@ -58,7 +35,7 @@ def products_reviews_sentiments(df):
 
     reviews_sentiments_df.to_csv(f"{ANALYSIS_OUTPUT}/products_reviews_sentiments.csv", index=False)
 
-def product_categories(df):
+def product_categories(df: pd.DataFrame) -> None:
     catalog = (
     df[["brand_name","product_id","product_name",
         "primary_category","secondary_category","tertiary_category"]]
@@ -76,7 +53,7 @@ def product_categories(df):
     )
     brand_category_summary.to_csv(f"{ANALYSIS_OUTPUT}/product_categories.csv", index=False)
 
-def products_count(df):
+def products_count(df: pd.DataFrame) -> None:
     products_per_brand = (
     df.groupby("brand_name")["product_id"]
       .nunique()
@@ -85,7 +62,7 @@ def products_count(df):
     )
     products_per_brand.to_csv(f"{ANALYSIS_OUTPUT}/products_count.csv", index=False)
 
-def products_price_range(df):
+def products_price_range(df: pd.DataFrame) -> None:
     product_df = (
     df[[
         "product_id", "product_name", "brand_name",
@@ -117,7 +94,7 @@ def products_price_range(df):
     )
     category_price_brand.to_csv(f"{ANALYSIS_OUTPUT}/products_price_range.csv", index=False)
 
-def loves_count(df):
+def loves_count(df: pd.DataFrame) -> None:
     def product_level(keys):
         return (
             df.groupby(keys, as_index=False)
@@ -138,6 +115,9 @@ def loves_count(df):
 
     product_loves_cat = product_level(["product_id", "product_name", "brand_name",
                 "primary_category", "secondary_category", "tertiary_category"])
+    product_loves_cat[["primary_category", "secondary_category", "tertiary_category"]] = (
+        product_loves_cat[["primary_category", "secondary_category", "tertiary_category"]].fillna("Unknown")
+    )
     category_loves = (
         product_loves_cat.groupby("primary_category", as_index=False)
                         .agg(total_loves=("loves_count", "sum"),
@@ -146,7 +126,7 @@ def loves_count(df):
     )
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
-def product_price_tier(df):
+def product_price_tier(df: pd.DataFrame) -> None:
     required_data = df[["product_id", "product_name", "primary_category","price_per_100"]]
     mask = required_data["price_per_100"].notna()
     cutoffs = required_data[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
@@ -158,13 +138,13 @@ def product_price_tier(df):
     required_data.loc[mask & (required_data["price_per_100"] >  required_data["p90"]), "tier"] = "Luxury"
     required_data.to_csv(f"{ANALYSIS_OUTPUT}/product_price_tier.csv", index=False)
 
-def online_products(df):
+def online_products(df: pd.DataFrame) -> None:
     df = df.copy()
     df["online_only"] = pd.to_numeric(df["online_only"], errors="coerce").fillna(0).astype(int)
     online_only_df = df[df["online_only"] == 1]
     online_only_df.to_csv(f"{ANALYSIS_OUTPUT}/online_products.csv", index=False)
 
-def exclusive_products(df):
+def exclusive_products(df: pd.DataFrame) -> None:
     df = df.copy()
     df["sephora_exclusive"] = (
         pd.to_numeric(df["sephora_exclusive"], errors="coerce")
@@ -175,10 +155,55 @@ def exclusive_products(df):
     sephora_exclusive_df.to_csv(f"{ANALYSIS_OUTPUT}/exclusive_products.csv", index=False)
 
 
+def sentiment_summary(df: pd.DataFrame) -> None:
+    """Pre-aggregate sentiment data for the dashboard (avoids loading 1M+ rows)."""
+    reviews = df[["brand_name", "product_id", "product_name", "review_title"]].copy()
+    reviews["review_title_clean"] = reviews["review_title"].fillna("").astype(str).str.strip()
+    reviews["title_compound"] = reviews["review_title_clean"].apply(
+        lambda x: analyzer.polarity_scores(x)["compound"]
+    )
+    reviews["title_sentiment"] = "neutral"
+    reviews.loc[reviews["title_compound"] >= 0.05, "title_sentiment"] = "positive"
+    reviews.loc[reviews["title_compound"] <= -0.05, "title_sentiment"] = "negative"
+
+    # Overall counts
+    overall = reviews["title_sentiment"].value_counts().reset_index()
+    overall.columns = ["sentiment", "count"]
+    overall.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_overall.csv", index=False)
+
+    # Per-brand: counts + avg compound
+    brand_sent = reviews.groupby(["brand_name", "title_sentiment"], as_index=False).size()
+    brand_sent.columns = ["brand_name", "sentiment", "count"]
+    brand_sent.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_by_brand.csv", index=False)
+
+    brand_compound = reviews.groupby("brand_name", as_index=False)["title_compound"].mean()
+    brand_compound.columns = ["brand_name", "avg_compound"]
+    brand_compound.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_brand_compound.csv", index=False)
+
+
+def price_tier_summary(df: pd.DataFrame) -> None:
+    """Pre-aggregate price tier data for the dashboard (avoids loading 1M+ rows)."""
+    required = df[["product_id", "product_name", "primary_category", "price_per_100"]].copy()
+    mask = required["price_per_100"].notna()
+    cutoffs = required[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
+    cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
+    required = required.merge(cutoffs, on="primary_category", how="left")
+    required["tier"] = None
+    required.loc[mask & (required["price_per_100"] <= required["p60"]), "tier"] = "Standard"
+    required.loc[mask & (required["price_per_100"] > required["p60"]) & (required["price_per_100"] <= required["p90"]), "tier"] = "Premium"
+    required.loc[mask & (required["price_per_100"] > required["p90"]), "tier"] = "Luxury"
+
+    tier_counts = required[required["tier"].notna()].groupby("tier", as_index=False).size()
+    tier_counts.columns = ["tier", "count"]
+    tier_counts.to_csv(f"{ANALYSIS_OUTPUT}/price_tier_summary.csv", index=False)
+
+
 if __name__ == "__main__":
+    from ingest import merge_raw_csvs
+
     os.makedirs(ANALYSIS_OUTPUT, exist_ok=True)
 
-    merged_df = merge_df()
+    merged_df = merge_raw_csvs()
     clean_df = clean_text(merged_df)
     clean_df.to_csv(f"{ANALYSIS_OUTPUT}/clean_merged.csv", index=False)
 
@@ -191,5 +216,7 @@ if __name__ == "__main__":
     product_price_tier(clean_df)
     online_products(clean_df)
     exclusive_products(clean_df)
+    sentiment_summary(clean_df)
+    price_tier_summary(clean_df)
 
     print("[analysis] All analysis outputs saved.")

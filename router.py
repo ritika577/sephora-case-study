@@ -1,3 +1,4 @@
+import re
 from ollama_utils import call_ollama
 from config import OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
@@ -68,8 +69,8 @@ def classify_question(question: str) -> str:
         "sephora exclusive", "out of stock"
     ]
 
-    has_structured = any(word in q for word in structured_words)
-    has_semantic = any(word in q for word in semantic_words)
+    has_structured = any(re.search(rf"\b{re.escape(word)}\b", q) for word in structured_words)
+    has_semantic = any(re.search(rf"\b{re.escape(word)}\b", q) for word in semantic_words)
 
     if has_structured and has_semantic:
         return "hybrid"

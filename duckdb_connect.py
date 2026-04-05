@@ -4,15 +4,22 @@ from typing import Optional, Tuple
 from ollama_utils import call_ollama
 from config import DB_PATH, TABLE_NAME, DEFAULT_LIMIT, MAX_SQL_RETRIES, OLLAMA_MODEL, OLLAMA_GENERATE_URL
 
-# DUCKDB SETUP
-con = duckdb.connect(DB_PATH)
+# Lazy connection — created on first use, not at import time
+_con = None
+
+
+def _get_connection():
+    global _con
+    if _con is None:
+        _con = duckdb.connect(DB_PATH)
+    return _con
 
 
 # =========================================================
 # SCHEMA HELPERS
 # =========================================================
 def get_schema_info() -> list[tuple]:
-    return con.execute(f"DESCRIBE {TABLE_NAME}").fetchall()
+    return _get_connection().execute(f"DESCRIBE {TABLE_NAME}").fetchall()
 
 
 def get_schema_text() -> str:
@@ -155,7 +162,7 @@ def basic_sql_safety_check(sql: str) -> Tuple[bool, Optional[str]]:
 
 def explain_validation(sql: str) -> Tuple[bool, Optional[str]]:
     try:
-        con.execute(f"EXPLAIN {sql}")
+        _get_connection().execute(f"EXPLAIN {sql}")
         return True, None
     except Exception as e:
         return False, str(e)
@@ -195,17 +202,18 @@ def generate_sql(question: str, previous_error: Optional[str] = None) -> Tuple[O
 # EXECUTION
 # =========================================================
 def run_query(sql: str):
-    return con.execute(sql).fetchdf()
+    return _get_connection().execute(sql).fetchdf()
 
 
-def process_structured_question(question: str) -> Tuple[Optional[object], Optional[str]]:
+def process_structured_question(question: str) -> Tuple[Optional[object], Optional[str], Optional[str]]:
     """
+    Returns (dataframe, error, generated_sql).
     This function assumes the router has already decided
     that the question is structured.
     """
     try:
         if not question or not question.strip():
-            return None, "Question is empty."
+            return None, "Question is empty.", None
 
         last_error = None
         generated_sql = None
@@ -214,7 +222,7 @@ def process_structured_question(question: str) -> Tuple[Optional[object], Option
             sql, gen_error = generate_sql(question, previous_error=last_error)
 
             if gen_error:
-                return None, gen_error
+                return None, gen_error, None
 
             generated_sql = sql
 
@@ -225,9 +233,9 @@ def process_structured_question(question: str) -> Tuple[Optional[object], Option
             last_error = validation_error
 
             if attempt == MAX_SQL_RETRIES:
-                return None, validation_error
+                return None, validation_error, generated_sql
 
         df = run_query(generated_sql)
-        return df, None
+        return df, None, generated_sql
     except Exception as e:
-        return None, str(e)
+        return None, str(e), None
