@@ -104,10 +104,12 @@ page = st.sidebar.radio(
     ["Overview", "Brand Analysis", "Price Analysis", "Sentiment Analysis", "Ask AI"],
 )
 
-st.title("Sephora Product Analysis")
+st.title("Sephora Skincare Analysis")
 st.caption(
-    "Explore product performance, popularity (loves), ratings, pricing, and sentiment. "
-    "Use Ask AI to query the data in plain English."
+    "Exploring skincare product performance, popularity (loves), ratings, pricing, "
+    "and review sentiment. The dataset covers **Skincare products only** "
+    "(~1,700 products across 140 brands). Use Ask AI to query the data in plain English.",
+    unsafe_allow_html=False,
 )
 st.divider()
 
@@ -124,7 +126,10 @@ if page == "Overview":
     # --- KPI Row ---
     total_products = int(products_count["product_id"].sum())
     total_brands = len(products_count)
-    avg_rating = round(ratings["avg_rating"].mean(), 2)
+    # Weighted average: products with more reviews count proportionally more
+    avg_rating = round(
+        (ratings["avg_rating"] * ratings["review_count"]).sum() / ratings["review_count"].sum(), 2
+    )
     total_loves = int(brands_loves["total_loves"].sum())
 
     c1, c2, c3, c4 = st.columns(4)
@@ -374,7 +379,12 @@ elif page == "Sentiment Analysis":
 # PAGE: ASK AI
 # =============================================================
 elif page == "Ask AI":
-    st.subheader("Ask a Question About Sephora Products")
+    st.subheader("Ask a Question About Sephora Skincare")
+    st.info(
+        "This dataset contains **Skincare products only** (~1,700 products, 140 brands, ~1M reviews). "
+        "Questions about Makeup, Fragrance, Hair, etc. cannot be answered.",
+        icon="💡",
+    )
     st.write(
         "Type a natural language question below, or try one of these examples:"
     )

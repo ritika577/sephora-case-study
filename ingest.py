@@ -53,6 +53,12 @@ def merge_raw_csvs() -> pd.DataFrame:
     df = df.drop(columns=cols_to_drop)
     df = df.rename(columns={c: c[:-2] for c in df.columns if c.endswith("_x")})
 
+    # drop leaked pandas index columns from raw CSVs (e.g. "Unnamed: 0")
+    unnamed_cols = [c for c in df.columns if c.startswith("Unnamed")]
+    if unnamed_cols:
+        df = df.drop(columns=unnamed_cols)
+        print(f"[ingest] Dropped leaked index columns: {unnamed_cols}")
+
     # drop rows with no price (can't analyze them)
     df = df.dropna(subset=["price_usd"]).copy()
     print(f"[ingest] Merged: {len(df)} rows")

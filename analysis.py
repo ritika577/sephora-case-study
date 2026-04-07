@@ -21,17 +21,22 @@ def products_rating_brand_wise(df: pd.DataFrame) -> None:
 
 
 def products_reviews_sentiments(df: pd.DataFrame) -> None:
-    # 1) prepare titles
-    reviews_sentiments_df = df[["brand_name", "product_id", "product_name", "review_title"]].copy()
-    reviews_sentiments_df["review_title_clean"] = reviews_sentiments_df["review_title"].fillna("").astype(str).str.strip()
+    # 1) prepare text — use review_text as primary, fall back to review_title
+    reviews_sentiments_df = df[["brand_name", "product_id", "product_name",
+                                 "review_text", "review_title"]].copy()
+    review_text = reviews_sentiments_df["review_text"].fillna("").astype(str).str.strip()
+    review_title = reviews_sentiments_df["review_title"].fillna("").astype(str).str.strip()
+    reviews_sentiments_df["sentiment_source"] = review_text.where(review_text != "", review_title)
 
-    # 2) get compound score
-    reviews_sentiments_df["title_compound"] = reviews_sentiments_df["review_title_clean"].apply(lambda x: analyzer.polarity_scores(x)["compound"])
+    # 2) get compound score from the actual review content
+    reviews_sentiments_df["compound"] = reviews_sentiments_df["sentiment_source"].apply(
+        lambda x: analyzer.polarity_scores(x)["compound"]
+    )
 
     # 3) label sentiment
-    reviews_sentiments_df["title_sentiment"] = "neutral"
-    reviews_sentiments_df.loc[reviews_sentiments_df["title_compound"] >= 0.05, "title_sentiment"] = "positive"
-    reviews_sentiments_df.loc[reviews_sentiments_df["title_compound"] <= -0.05, "title_sentiment"] = "negative"
+    reviews_sentiments_df["sentiment"] = "neutral"
+    reviews_sentiments_df.loc[reviews_sentiments_df["compound"] >= 0.05, "sentiment"] = "positive"
+    reviews_sentiments_df.loc[reviews_sentiments_df["compound"] <= -0.05, "sentiment"] = "negative"
 
     reviews_sentiments_df.to_csv(f"{ANALYSIS_OUTPUT}/products_reviews_sentiments.csv", index=False)
 
@@ -127,7 +132,12 @@ def loves_count(df: pd.DataFrame) -> None:
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
 def product_price_tier(df: pd.DataFrame) -> None:
-    required_data = df[["product_id", "product_name", "primary_category","price_per_100"]]
+    # Deduplicate to product-level first — avoid counting one product per review row
+    required_data = (
+        df[["product_id", "product_name", "primary_category", "price_per_100"]]
+        .drop_duplicates(subset=["product_id"])
+        .copy()
+    )
     mask = required_data["price_per_100"].notna()
     cutoffs = required_data[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
     cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
@@ -156,34 +166,53 @@ def exclusive_products(df: pd.DataFrame) -> None:
 
 
 def sentiment_summary(df: pd.DataFrame) -> None:
-    """Pre-aggregate sentiment data for the dashboard (avoids loading 1M+ rows)."""
-    reviews = df[["brand_name", "product_id", "product_name", "review_title"]].copy()
-    reviews["review_title_clean"] = reviews["review_title"].fillna("").astype(str).str.strip()
-    reviews["title_compound"] = reviews["review_title_clean"].apply(
+    """Pre-aggregate sentiment data for the dashboard.
+
+    Uses review_text as the primary source for VADER sentiment (richer signal).
+    Falls back to review_title only when review_text is empty.
+    """
+    reviews = df[["brand_name", "product_id", "product_name",
+                   "review_text", "review_title"]].copy()
+    review_text = reviews["review_text"].fillna("").astype(str).str.strip()
+    review_title = reviews["review_title"].fillna("").astype(str).str.strip()
+    reviews["sentiment_source"] = review_text.where(review_text != "", review_title)
+
+    # Drop rows where both text and title are empty — no signal to score
+    reviews = reviews[reviews["sentiment_source"].str.len() > 0]
+
+    reviews["compound"] = reviews["sentiment_source"].apply(
         lambda x: analyzer.polarity_scores(x)["compound"]
     )
-    reviews["title_sentiment"] = "neutral"
-    reviews.loc[reviews["title_compound"] >= 0.05, "title_sentiment"] = "positive"
-    reviews.loc[reviews["title_compound"] <= -0.05, "title_sentiment"] = "negative"
+    reviews["sentiment"] = "neutral"
+    reviews.loc[reviews["compound"] >= 0.05, "sentiment"] = "positive"
+    reviews.loc[reviews["compound"] <= -0.05, "sentiment"] = "negative"
 
     # Overall counts
-    overall = reviews["title_sentiment"].value_counts().reset_index()
+    overall = reviews["sentiment"].value_counts().reset_index()
     overall.columns = ["sentiment", "count"]
     overall.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_overall.csv", index=False)
 
     # Per-brand: counts + avg compound
-    brand_sent = reviews.groupby(["brand_name", "title_sentiment"], as_index=False).size()
+    brand_sent = reviews.groupby(["brand_name", "sentiment"], as_index=False).size()
     brand_sent.columns = ["brand_name", "sentiment", "count"]
     brand_sent.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_by_brand.csv", index=False)
 
-    brand_compound = reviews.groupby("brand_name", as_index=False)["title_compound"].mean()
+    brand_compound = reviews.groupby("brand_name", as_index=False)["compound"].mean()
     brand_compound.columns = ["brand_name", "avg_compound"]
     brand_compound.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_brand_compound.csv", index=False)
 
 
 def price_tier_summary(df: pd.DataFrame) -> None:
-    """Pre-aggregate price tier data for the dashboard (avoids loading 1M+ rows)."""
-    required = df[["product_id", "product_name", "primary_category", "price_per_100"]].copy()
+    """Pre-aggregate price tier data for the dashboard.
+
+    Deduplicates to product-level first so each product is counted once,
+    not once per review row.
+    """
+    required = (
+        df[["product_id", "product_name", "primary_category", "price_per_100"]]
+        .drop_duplicates(subset=["product_id"])
+        .copy()
+    )
     mask = required["price_per_100"].notna()
     cutoffs = required[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
     cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
