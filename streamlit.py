@@ -217,20 +217,21 @@ elif page == "Brand Analysis":
     st.plotly_chart(fig2, use_container_width=True)
 
     # --- Brand: Loves vs Product Count scatter ---
-    st.subheader("Loves vs Product Count by Brand")
+    st.subheader("Loves vs Product Count by Brand (Top 30)")
     bl = brands_loves.copy()
     if selected_brands:
         bl = bl[bl["brand_name"].isin(selected_brands)]
+    else:
+        bl = bl.nlargest(30, "total_loves")
 
     fig3 = px.scatter(
         bl,
         x="product_count",
         y="total_loves",
-        text="brand_name",
+        hover_name="brand_name",
         size="total_loves",
         labels={"product_count": "Number of Products", "total_loves": "Total Loves"},
     )
-    fig3.update_traces(textposition="top center", textfont_size=8)
     fig3.update_layout(height=500)
     st.plotly_chart(fig3, use_container_width=True)
 
@@ -331,12 +332,16 @@ elif page == "Sentiment Analysis":
         m3.metric("Negative", f"{pct_neg}%")
 
         # Top 5 most negative brands — actionable insight
-        st.markdown("**Brands with Highest Negative Review Ratio**")
+        # Require minimum 30 reviews so small-sample brands don't dominate
+        MIN_REVIEWS = 30
+        st.markdown(f"**Brands with Highest Negative Review Ratio** (min {MIN_REVIEWS} reviews)")
         brand_total = brand_sent.groupby("brand_name")["count"].sum()
+        brand_total = brand_total[brand_total >= MIN_REVIEWS]
         brand_neg = brand_sent[brand_sent["sentiment"] == "negative"].set_index("brand_name")["count"]
         neg_ratio = (brand_neg / brand_total * 100).dropna().sort_values(ascending=False).head(5)
         neg_df = neg_ratio.reset_index()
         neg_df.columns = ["Brand", "Negative %"]
+        neg_df["Reviews"] = brand_total.loc[neg_df["Brand"]].values.astype(int)
         neg_df["Negative %"] = neg_df["Negative %"].round(1).astype(str) + "%"
         st.dataframe(neg_df, use_container_width=True, hide_index=True)
 

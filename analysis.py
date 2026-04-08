@@ -20,25 +20,6 @@ def products_rating_brand_wise(df: pd.DataFrame) -> None:
     prod_rating.to_csv(f"{ANALYSIS_OUTPUT}/products_rating_brand_wise.csv", index=False)
 
 
-def products_reviews_sentiments(df: pd.DataFrame) -> None:
-    # 1) prepare text — use review_text as primary, fall back to review_title
-    reviews_sentiments_df = df[["brand_name", "product_id", "product_name",
-                                 "review_text", "review_title"]].copy()
-    review_text = reviews_sentiments_df["review_text"].fillna("").astype(str).str.strip()
-    review_title = reviews_sentiments_df["review_title"].fillna("").astype(str).str.strip()
-    reviews_sentiments_df["sentiment_source"] = review_text.where(review_text != "", review_title)
-
-    # 2) get compound score from the actual review content
-    reviews_sentiments_df["compound"] = reviews_sentiments_df["sentiment_source"].apply(
-        lambda x: analyzer.polarity_scores(x)["compound"]
-    )
-
-    # 3) label sentiment
-    reviews_sentiments_df["sentiment"] = "neutral"
-    reviews_sentiments_df.loc[reviews_sentiments_df["compound"] >= 0.05, "sentiment"] = "positive"
-    reviews_sentiments_df.loc[reviews_sentiments_df["compound"] <= -0.05, "sentiment"] = "negative"
-
-    reviews_sentiments_df.to_csv(f"{ANALYSIS_OUTPUT}/products_reviews_sentiments.csv", index=False)
 
 def product_categories(df: pd.DataFrame) -> None:
     catalog = (
@@ -131,38 +112,6 @@ def loves_count(df: pd.DataFrame) -> None:
     )
     category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
-def product_price_tier(df: pd.DataFrame) -> None:
-    # Deduplicate to product-level first — avoid counting one product per review row
-    required_data = (
-        df[["product_id", "product_name", "primary_category", "price_per_100"]]
-        .drop_duplicates(subset=["product_id"])
-        .copy()
-    )
-    mask = required_data["price_per_100"].notna()
-    cutoffs = required_data[mask].groupby("primary_category")["price_per_100"].quantile([0.60, 0.90]).unstack()
-    cutoffs = cutoffs.rename(columns={0.6: "p60", 0.9: "p90"})
-    required_data = required_data.merge(cutoffs, on="primary_category", how="left")
-    required_data["tier"] = None
-    required_data.loc[mask & (required_data["price_per_100"] <= required_data["p60"]), "tier"] = "Standard"
-    required_data.loc[mask & (required_data["price_per_100"] >  required_data["p60"]) & (required_data["price_per_100"] <= required_data["p90"]), "tier"] = "Premium"
-    required_data.loc[mask & (required_data["price_per_100"] >  required_data["p90"]), "tier"] = "Luxury"
-    required_data.to_csv(f"{ANALYSIS_OUTPUT}/product_price_tier.csv", index=False)
-
-def online_products(df: pd.DataFrame) -> None:
-    df = df.copy()
-    df["online_only"] = pd.to_numeric(df["online_only"], errors="coerce").fillna(0).astype(int)
-    online_only_df = df[df["online_only"] == 1]
-    online_only_df.to_csv(f"{ANALYSIS_OUTPUT}/online_products.csv", index=False)
-
-def exclusive_products(df: pd.DataFrame) -> None:
-    df = df.copy()
-    df["sephora_exclusive"] = (
-        pd.to_numeric(df["sephora_exclusive"], errors="coerce")
-        .fillna(0)
-        .astype(int)
-    )
-    sephora_exclusive_df = df[df["sephora_exclusive"] == 1]
-    sephora_exclusive_df.to_csv(f"{ANALYSIS_OUTPUT}/exclusive_products.csv", index=False)
 
 
 def sentiment_summary(df: pd.DataFrame) -> None:
@@ -237,14 +186,10 @@ if __name__ == "__main__":
     clean_df.to_csv(f"{ANALYSIS_OUTPUT}/clean_merged.csv", index=False)
 
     products_rating_brand_wise(clean_df)
-    products_reviews_sentiments(clean_df)
     product_categories(clean_df)
     products_count(clean_df)
     products_price_range(clean_df)
     loves_count(clean_df)
-    product_price_tier(clean_df)
-    online_products(clean_df)
-    exclusive_products(clean_df)
     sentiment_summary(clean_df)
     price_tier_summary(clean_df)
 
