@@ -1,3 +1,4 @@
+import atexit
 import duckdb
 import re
 from typing import Optional, Tuple
@@ -13,6 +14,16 @@ def _get_connection():
     if _con is None:
         _con = duckdb.connect(DB_PATH)
     return _con
+
+
+def _close_connection():
+    global _con
+    if _con is not None:
+        _con.close()
+        _con = None
+
+
+atexit.register(_close_connection)
 
 
 # =========================================================

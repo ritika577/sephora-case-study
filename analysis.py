@@ -99,18 +99,6 @@ def loves_count(df: pd.DataFrame) -> None:
     )
     brand_loves.to_csv(f"{ANALYSIS_OUTPUT}/brands_loves_count.csv", index=False)
 
-    product_loves_cat = product_level(["product_id", "product_name", "brand_name",
-                "primary_category", "secondary_category", "tertiary_category"])
-    product_loves_cat[["primary_category", "secondary_category", "tertiary_category"]] = (
-        product_loves_cat[["primary_category", "secondary_category", "tertiary_category"]].fillna("Unknown")
-    )
-    category_loves = (
-        product_loves_cat.groupby("primary_category", as_index=False)
-                        .agg(total_loves=("loves_count", "sum"),
-                            product_count=("product_id", "nunique"))
-                        .sort_values("total_loves", ascending=False)
-    )
-    category_loves.to_csv(f"{ANALYSIS_OUTPUT}/category_loves_count.csv", index=False)
 
 
 
@@ -149,6 +137,61 @@ def sentiment_summary(df: pd.DataFrame) -> None:
     brand_compound = reviews.groupby("brand_name", as_index=False)["compound"].mean()
     brand_compound.columns = ["brand_name", "avg_compound"]
     brand_compound.to_csv(f"{ANALYSIS_OUTPUT}/sentiment_brand_compound.csv", index=False)
+
+
+def recommendation_summary(df: pd.DataFrame) -> None:
+    """Aggregate is_recommended data — overall rate and per-brand rates."""
+    recs = df[["brand_name", "is_recommended"]].dropna(subset=["is_recommended"]).copy()
+    recs["is_recommended"] = recs["is_recommended"].astype(int)
+
+    # Overall recommendation rate
+    total = len(recs)
+    recommended = recs["is_recommended"].sum()
+    overall = pd.DataFrame([{
+        "total_reviews": total,
+        "recommended": int(recommended),
+        "not_recommended": int(total - recommended),
+        "recommendation_rate": round(recommended / total * 100, 1),
+    }])
+    overall.to_csv(f"{ANALYSIS_OUTPUT}/recommendation_overall.csv", index=False)
+
+    # Per-brand recommendation rate (min 10 reviews)
+    brand_rec = recs.groupby("brand_name", as_index=False).agg(
+        total_reviews=("is_recommended", "count"),
+        recommended=("is_recommended", "sum"),
+    )
+    brand_rec = brand_rec[brand_rec["total_reviews"] >= 10]
+    brand_rec["recommendation_rate"] = (
+        brand_rec["recommended"] / brand_rec["total_reviews"] * 100
+    ).round(1)
+    brand_rec = brand_rec.sort_values("recommendation_rate", ascending=False)
+    brand_rec.to_csv(f"{ANALYSIS_OUTPUT}/recommendation_by_brand.csv", index=False)
+
+
+def review_trends(df: pd.DataFrame) -> None:
+    """Aggregate review counts and avg rating by month for time-series charts."""
+    reviews = df[["submission_time", "rating", "brand_name"]].copy()
+    reviews["submission_time"] = pd.to_datetime(reviews["submission_time"], errors="coerce")
+    reviews = reviews.dropna(subset=["submission_time"])
+    reviews["month"] = reviews["submission_time"].dt.to_period("M").dt.to_timestamp()
+
+    # Overall monthly trend
+    monthly = (
+        reviews.groupby("month", as_index=False)
+        .agg(review_count=("rating", "count"), avg_rating=("rating", "mean"))
+    )
+    monthly["avg_rating"] = monthly["avg_rating"].round(2)
+    monthly.to_csv(f"{ANALYSIS_OUTPUT}/review_trends_monthly.csv", index=False)
+
+    # Per-brand monthly (top 10 brands by total reviews)
+    top10 = reviews["brand_name"].value_counts().head(10).index
+    brand_monthly = (
+        reviews[reviews["brand_name"].isin(top10)]
+        .groupby(["month", "brand_name"], as_index=False)
+        .agg(review_count=("rating", "count"), avg_rating=("rating", "mean"))
+    )
+    brand_monthly["avg_rating"] = brand_monthly["avg_rating"].round(2)
+    brand_monthly.to_csv(f"{ANALYSIS_OUTPUT}/review_trends_brand_monthly.csv", index=False)
 
 
 def price_tier_summary(df: pd.DataFrame) -> None:
@@ -191,6 +234,8 @@ if __name__ == "__main__":
     products_price_range(clean_df)
     loves_count(clean_df)
     sentiment_summary(clean_df)
+    recommendation_summary(clean_df)
+    review_trends(clean_df)
     price_tier_summary(clean_df)
 
     print("[analysis] All analysis outputs saved.")
