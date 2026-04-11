@@ -88,6 +88,9 @@ def loves_count(df: pd.DataFrame) -> None:
         )
     product_loves = product_level(["product_id", "product_name", "brand_name"])
 
+    # All product-level loves (used for median calculations in dashboard)
+    product_loves.to_csv(f"{ANALYSIS_OUTPUT}/product_loves_all.csv", index=False)
+
     top_products = product_loves.sort_values("loves_count", ascending=False).head(20)
     top_products.to_csv(f"{ANALYSIS_OUTPUT}/loves_count.csv", index=False)
 
