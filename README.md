@@ -59,18 +59,25 @@ source .venv/bin/activate        # macOS/Linux
 pip install -r requirements.txt
 ```
 
-### Step 2: Download the required Ollama models
+### Step 2: Set up Ollama
+
+Download the required models:
 
 ```bash
 ollama pull qwen2.5:7b
 ollama pull nomic-embed-text
 ```
 
-Make sure Ollama is running:
+Start the Ollama server:
 
 ```bash
 ollama serve
 ```
+
+> **Ollama quick reference:**
+> - **Start:** `ollama serve` (keep this terminal open, or run in background)
+> - **Check if running:** `ollama list` (shows models if running, errors if not)
+> - **Stop:** `Ctrl+C` in the terminal, or `pkill ollama` if running in background
 
 ### Step 3: Add the raw data
 
