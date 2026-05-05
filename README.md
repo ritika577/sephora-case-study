@@ -1,6 +1,6 @@
 # Sephora Skincare Analysis Dashboard
 
-An interactive data analysis dashboard for Sephora skincare products, built with Streamlit and Plotly. It combines pre-computed analytics with an AI-powered natural language query system (Ask AI) that lets you explore ~1,700 products across 140 brands using plain English.
+An interactive data analysis dashboard for Sephora skincare products, built with Streamlit and Plotly. It combines pre-computed analytics with a **RAG-powered (Retrieval-Augmented Generation)** natural language query system (Ask AI) that uses **local LLMs** to let you explore ~1,700 products across 140 brands and ~1M reviews using plain English.
 
 ## Features
 
@@ -8,7 +8,7 @@ An interactive data analysis dashboard for Sephora skincare products, built with
 - **Brand Analysis** — Bubble chart comparing brand catalog size vs product quality (median rating and loves)
 - **Price Analysis** — Brand pricing strategies and price tier distribution
 - **Sentiment Analysis** — Review sentiment breakdown, brand sentiment ranking, and recommendation rates
-- **Ask AI** — Ask questions in plain English. Routes queries to SQL (structured), review search (semantic), or both (hybrid)
+- **Ask AI** — RAG-powered natural language interface. Routes queries to SQL (structured), semantic review search via ChromaDB (semantic), or both (hybrid). LLM generates SQL, retrieves relevant reviews, and summarizes answers.
 
 ## Tech Stack
 
